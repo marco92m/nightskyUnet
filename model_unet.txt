@@ -1,0 +1,67 @@
+#UNet model definition for 512 x 512 monochromatic image semantic segmentation. Sigmoid is the final activation function.
+#===============================================================================================================================
+                                                  #MODEL DEFINITION
+def unet(dim, learn_rate, lmbda, drop, FL, n_filters, init):
+    """Parameters:
+
+    dim : image dimension (512)
+    learn_rate : learning rate for the optimizer (1e-4)
+    lmbda : regularization parameter (1e-5)
+    drop : dropout percentage (0.15)
+    FL : kernel size- (3)
+    n_filters: number of filters (112)
+    init: kernel initializer (he_normal)
+
+    Output:
+
+    model : unet model"""
+
+    img_input = tf.keras.Input(shape=(dim,dim,1))
+    #First double convolution and max pooling layers
+    d1 = Conv2D(n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(img_input)
+    d1 = Conv2D(n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(d1)
+    d1P = MaxPooling2D(pool_size=(2,2), strides=(2,2))(d1)
+    #Second double convolution and max pooling layers
+    d2 = Conv2D(2*n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(d1P)
+    d2 = Conv2D(2*n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(d2)
+    d2P = MaxPooling2D(pool_size=(2,2), strides=(2,2))(d2)
+    #Third double convolution and max pooling layers
+    d3 = Conv2D(4*n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(d2P)
+    d3 = Conv2D(4*n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(d3)
+    d3P = MaxPooling2D(pool_size=(2,2), strides=(2,2))(d3)
+    #Double convolution
+    u = Conv2D(4*n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(d3P)
+    u = Conv2D(4*n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(u)
+    #Upsampling process with convolutions, dropout layers and concatenation
+    u1 = UpSampling2D(size=(2,2))(u)
+    u1 = Concatenate(axis=3)([d3,u1])
+    u1 = Dropout(drop)(u1)
+    u1 = Conv2D(2*n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(u1)
+    u1 = Conv2D(2*n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(u1)
+
+    u2 = UpSampling2D(size=(2,2))(u1)
+    u2 = Concatenate(axis=3)([d2,u2])
+    u2 = Dropout(drop)(u2)
+    u2 = Conv2D(n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(u2)
+    u2 = Conv2D(n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(u2)
+
+    u3 = UpSampling2D(size=(2,2))(u2)
+    u3 = Concatenate(axis=3)([d1,u3])
+    u3 = Dropout(drop)(u3)
+    u3 = Conv2D(n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(u3)
+    u3 = Conv2D(n_filters,FL,padding='same',activation='relu',kernel_initializer=init,kernel_regularizer=l2(lmbda))(u3)
+
+    # Final output:
+
+    final_activation='sigmoid'  # output a continuous number between 0 and 1
+    u3 = Conv2D(filters=1,kernel_size=1, padding='same',activation=final_activation,kernel_initializer=init,kernel_regularizer=l2(lmbda))(u3)
+    model = Model(inputs=img_input,outputs=u3)
+
+    opt = Adam(learning_rate=learn_rate)
+    model.compile(loss='binary_crossentropy',optimizer=opt,metrics=['accuracy'])
+
+    return model
+#===============================================================================================================================
+                                                  #MODEL CONFIGURATION
+filtri=128
+model=unet(512,1e-4,1e-5,0.25,3,filtri,'he_normal')    
