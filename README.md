@@ -13,3 +13,7 @@ First two folders are related to Training and Validation purposes. The last two 
 
 
 +Orione.png is a real night sky images of the Orion constellation. SIze 512 x 512 pixels monochromatic image.
+
+
+
++model_unet.txt contains the U-Net model used for training and validation.
